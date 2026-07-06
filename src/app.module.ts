@@ -15,6 +15,7 @@ import { OmrModule } from './modules/omr/omr.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { MenusModule } from './modules/menus/menus.module';
 import { SchoolsModule } from './modules/schools/schools.module';
+import { TeachersModule } from './modules/teachers/teachers.module';
 
 import { MailModule } from './modules/mail/mail.module';
 
@@ -60,6 +61,7 @@ import { MailModule } from './modules/mail/mail.module';
     AuthModule,
     MenusModule,
     SchoolsModule,
+    TeachersModule,
   ],
   providers: [],
 })

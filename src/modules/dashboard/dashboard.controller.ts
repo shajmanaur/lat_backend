@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/auth-roles.guard';
 
@@ -8,7 +8,9 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('stats')
-  async getStats() {
-    return this.dashboardService.getOverviewStats();
+  async getStats(@Request() req: any) {
+    const userId = req.user.sub;
+    const roleId = req.user.role;
+    return this.dashboardService.getOverviewStats(userId, roleId);
   }
 }

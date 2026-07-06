@@ -18,40 +18,70 @@ export class DashboardService {
     private dataSource: DataSource,
   ) {}
 
-  async getOverviewStats() {
-    const totalCoordinators = await this.userRepo.count({ where: { role_id: 3, status: '1' } });
-    const totalTeachers = await this.userRepo.count({ where: { role_id: 4, status: '1' } });
-    const totalStudents = await this.studentRepo.count({ where: { status: true } });
+  async getOverviewStats(userId: number, roleId: number) {
+    let udiseCode = null;
+    if (roleId === 3) {
+      const coord = await this.teacherRepo.findOne({ where: { user_id: userId } });
+      if (coord) udiseCode = coord.udise_code;
+    }
+
+    const tQb = this.userRepo.createQueryBuilder('u')
+      .where('u.role_id = 4 AND u.status = "1"');
+    if (udiseCode) {
+      tQb.innerJoin(TeacherMaster, 't', 't.user_id = u.user_id')
+         .andWhere('t.udise_code = :udiseCode', { udiseCode });
+    }
+    const totalTeachers = await tQb.getCount();
+
+    const cQb = this.userRepo.createQueryBuilder('u')
+      .where('u.role_id = 3 AND u.status = "1"');
+    if (udiseCode) {
+      cQb.innerJoin(TeacherMaster, 't', 't.user_id = u.user_id')
+         .andWhere('t.udise_code = :udiseCode', { udiseCode });
+    }
+    const totalCoordinators = await cQb.getCount();
     
-    const presentResult = await this.omrRepo
-      .createQueryBuilder('omr')
+    // For students
+    const sQb = this.studentRepo.createQueryBuilder('s')
+      .where('s.status = :status', { status: true });
+    if (udiseCode) sQb.andWhere('s.udise_code = :udiseCode', { udiseCode });
+    const totalStudents = await sQb.getCount();
+
+    // For OMR
+    const buildOmrQb = () => {
+      const qb = this.omrRepo.createQueryBuilder('omr');
+      if (udiseCode) {
+        qb.innerJoin('omr.student', 's')
+          .andWhere('s.udise_code = :udiseCode', { udiseCode });
+      }
+      return qb;
+    };
+
+    const presentResult = await buildOmrQb()
       .select('COUNT(DISTINCT omr.student_id)', 'count')
       .getRawOne();
-    const studentsPresent = parseInt(presentResult.count || '0', 10);
+    const studentsPresent = parseInt(presentResult?.count || '0', 10);
     const studentsAbsent = Math.max(0, totalStudents - studentsPresent);
 
-    const evaluatedResult = await this.omrRepo
-      .createQueryBuilder('omr')
+    const evaluatedResult = await buildOmrQb()
       .select('COUNT(DISTINCT omr.student_id)', 'count')
-      .where('omr.status = :status', { status: 1 })
+      .andWhere('omr.status = :status', { status: 1 })
       .getRawOne();
-    const evaluatedCount = parseInt(evaluatedResult.count || '0', 10);
+    const evaluatedCount = parseInt(evaluatedResult?.count || '0', 10);
     
-    const progressResult = await this.omrRepo
-      .createQueryBuilder('omr')
+    const progressResult = await buildOmrQb()
       .select('COUNT(DISTINCT omr.student_id)', 'count')
-      .where('omr.status = :status', { status: 0 })
+      .andWhere('omr.status = :status', { status: 0 })
       .getRawOne();
-    const progressCount = parseInt(progressResult.count || '0', 10);
-    
-    const gradeStats = await this.studentRepo
-      .createQueryBuilder('s')
+    const progressCount = parseInt(progressResult?.count || '0', 10);
+
+    const gradeQb = this.studentRepo.createQueryBuilder('s')
       .select('s.grade', 'name')
       .addSelect('COUNT(s.student_id)', 'students')
-      .where('s.status = :status', { status: true })
-      .groupBy('s.grade')
-      .getRawMany();
-      
+      .where('s.status = :status', { status: true });
+    if (udiseCode) gradeQb.andWhere('s.udise_code = :udiseCode', { udiseCode });
+    const gradeStats = await gradeQb.groupBy('s.grade').getRawMany();
+
     const predefinedGrades = [
       { id: '3', name: 'Grade 3', fill: '#34D399' }, 
       { id: '6', name: 'Grade 6', fill: '#60A5FA' }, 
@@ -67,28 +97,28 @@ export class DashboardService {
       };
     });
 
-    const regionStats = await this.dataSource.createQueryBuilder()
+    const regQb = this.dataSource.createQueryBuilder()
       .select('r.region_name', 'name')
       .addSelect('COUNT(s.student_id)', 'value')
       .from(StudentMaster, 's')
       .innerJoin(SchoolMaster, 'sm', 's.udise_code = sm.udise_code')
       .innerJoin(RegionMaster, 'r', 'sm.region_id = r.region_id')
-      .where('s.status = :status', { status: true })
-      .groupBy('r.region_name')
-      .orderBy('value', 'DESC')
-      .limit(5)
-      .getRawMany();
+      .where('s.status = :status', { status: true });
+    if (udiseCode) regQb.andWhere('s.udise_code = :udiseCode', { udiseCode });
+    const regionStats = await regQb.groupBy('r.region_name').orderBy('value', 'DESC').limit(5).getRawMany();
       
     const regionData = regionStats.map(r => ({
       name: r.name,
       value: parseInt(r.value, 10)
     }));
 
-    const recentActivities = await this.omrRepo.find({
-      relations: ['teacher', 'student'],
-      order: { created_at: 'DESC' },
-      take: 4,
-    });
+    const actQb = this.omrRepo.createQueryBuilder('omr')
+      .leftJoinAndSelect('omr.teacher', 'teacher')
+      .leftJoinAndSelect('omr.student', 'student')
+      .orderBy('omr.created_at', 'DESC')
+      .take(4);
+    if (udiseCode) actQb.andWhere('student.udise_code = :udiseCode', { udiseCode });
+    const recentActivities = await actQb.getMany();
     
     const activities = recentActivities.map((act, idx) => ({
       id: idx + 1,

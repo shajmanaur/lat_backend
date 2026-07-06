@@ -5,6 +5,7 @@ import { UserMaster } from '../../entities/user-master.entity';
 import { TeacherMaster } from '../../entities/teacher-master.entity';
 
 import { MailService } from '../mail/mail.service';
+import { encrypt } from '../../utils/encryption';
 
 @Injectable()
 export class CoordinatorsService {
@@ -64,7 +65,7 @@ export class CoordinatorsService {
         user_name: email,
         email: email,
         user_mobile: mobile,
-        password: mobile, // default password
+        password: encrypt(mobile), // encrypted default password
         role_id: 3,
         user_type_id: 3,
         status: '1',
@@ -144,7 +145,7 @@ export class CoordinatorsService {
               user_name: email,
               email: email,
               user_mobile: mobile,
-              password: mobile,
+              password: encrypt(mobile),
               role_id: 3,
               user_type_id: 3,
               status: '1',

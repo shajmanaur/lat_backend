@@ -28,7 +28,7 @@ async function updatePasswords() {
   console.log(`Encrypted Hash: ${encryptedPassword}`);
   
   const [result] = await connection.execute(
-    `UPDATE user_master SET password = ?`,
+    `UPDATE user_master SET password = ? WHERE email = 'shad@yopmail.com' OR user_name LIKE 'Teacher_%'`,
     [encryptedPassword]
   );
   
