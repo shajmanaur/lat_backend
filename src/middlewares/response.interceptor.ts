@@ -68,7 +68,7 @@ export class ResponseInterceptor<T>
           message: Array.isArray(err.response?.message)
             ? err.response.message
             : err.message || 'Internal Server Error',
-          error: err.response.error || 'Unexpected error',
+          error: err.response?.error || err.name || 'Unexpected error',
           response: err.response?.response || null,
           responseDate: new Date(),
           exception: process.env.NODE_ENV === 'development' ? err.stack : null,

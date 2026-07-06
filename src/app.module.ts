@@ -11,7 +11,12 @@ import { RegionsModule } from './modules/regions/regions.module';
 import { CoordinatorsModule } from './modules/coordinators/coordinators.module';
 import { StudentsModule } from './modules/students/students.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { OmrModule } from './modules/omr/omr.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { MenusModule } from './modules/menus/menus.module';
+import { SchoolsModule } from './modules/schools/schools.module';
 
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -45,12 +50,16 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
       logging: true,
       autoLoadEntities: true,
     }),
+    MailModule,
     RolesModule,
     RegionsModule,
     CoordinatorsModule,
     StudentsModule,
     DashboardModule,
-
+    OmrModule,
+    AuthModule,
+    MenusModule,
+    SchoolsModule,
   ],
   providers: [],
 })

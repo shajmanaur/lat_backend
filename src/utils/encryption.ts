@@ -4,8 +4,8 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const encryptionKey = process.env.ENCRYPTION_KEY;
-const algorithm = process.env.ALGORITHM;
+const encryptionKey = process.env.ENCRYPTION_KEY.substring(0, 32);
+const algorithm = process.env.ALGORITHM || 'aes-256-cbc';
 const IV = '0000000000000000';
 
 export const decrypt = (message) => {

@@ -30,7 +30,7 @@ export class TeacherGradeSectionMapping {
   @Column({ type: 'bigint', unsigned: true })
   created_by: string;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 
   @Column({ type: 'bigint', unsigned: true, nullable: true })
@@ -39,8 +39,6 @@ export class TeacherGradeSectionMapping {
   @UpdateDateColumn({
     type: 'timestamp',
     nullable: true,
-    default: null,
-    onUpdate: 'CURRENT_TIMESTAMP',
   })
   updated_at: Date | null;
 }

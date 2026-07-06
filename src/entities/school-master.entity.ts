@@ -29,14 +29,15 @@ export class SchoolMaster {
   @JoinColumn({ name: 'region_id' })
   region: RegionMaster;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
+
+  @Column({ type: 'bigint', unsigned: true, nullable: true })
+  updated_by: string | null;
 
   @UpdateDateColumn({
     type: 'timestamp',
     nullable: true,
-    default: null,
-    onUpdate: 'CURRENT_TIMESTAMP',
   })
   updated_at: Date | null;
 }

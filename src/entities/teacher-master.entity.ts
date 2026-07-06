@@ -1,5 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { UserMaster } from './user-master.entity';
+import { RegionMaster } from './region-master.entity';
+import { SchoolMaster } from './school-master.entity';
 
 @Entity('teacher_master')
 export class TeacherMaster {
@@ -26,9 +28,6 @@ export class TeacherMaster {
 
   @Column({ length: 20, nullable: true })
   udise_code: string;
-
-  @Column({ length: 255, nullable: true })
-  school_name: string;
 
   @Column({ length: 50, nullable: true, default: 'India' })
   country: string;
@@ -91,4 +90,16 @@ export class TeacherMaster {
   @ManyToOne(() => UserMaster)
   @JoinColumn({ name: 'updated_by' })
   updater: UserMaster;
+
+  @ManyToOne(() => UserMaster)
+  @JoinColumn({ name: 'user_id', referencedColumnName: 'user_id' })
+  user: UserMaster;
+
+  @ManyToOne(() => RegionMaster)
+  @JoinColumn({ name: 'region_id' })
+  region: RegionMaster;
+
+  @ManyToOne(() => SchoolMaster)
+  @JoinColumn({ name: 'udise_code', referencedColumnName: 'udise_code' })
+  school: SchoolMaster;
 }
