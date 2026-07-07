@@ -11,4 +11,4 @@ import { CoordinatorsController } from './coordinators.controller';
   providers: [CoordinatorsService],
   exports: [CoordinatorsService],
 })
-export class CoordinatorsModule {}
+export class CoordinatorsModule { }

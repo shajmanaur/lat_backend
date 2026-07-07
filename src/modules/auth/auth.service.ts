@@ -16,13 +16,13 @@ export class AuthService {
   ) {}
 
   async login(payload: LoginDto) {
-    const { user_name, password } = payload;
+    const { username, password } = payload;
     
     // Encrypt the incoming password to match what's in the DB
     const encryptedPassword = encrypt(password);
     
     const user = await this.userRepo.findOne({
-      where: { user_name: user_name, password: encryptedPassword, status: '1' }
+      where: { user_name: username, password: encryptedPassword, status: '1' }
     });
 
     if (!user) {
