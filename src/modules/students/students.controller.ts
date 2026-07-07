@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../auth/guards/auth-roles.guard';
 
@@ -9,10 +9,12 @@ export class StudentsController {
 
   @Get()
   async findAll(
+    @Request() req: any,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10'
   ) {
-    const result = await this.studentsService.findAll(+page, +limit);
+    const userId = req.user.sub;
+    const result = await this.studentsService.findAll(+page, +limit, userId);
     return {
       status: 'success',
       data: result.data,
@@ -21,6 +23,28 @@ export class StudentsController {
         page: +page,
         limit: +limit,
       }
+    };
+  }
+
+  @Post()
+  async createStudent(@Request() req: any, @Body() payload: any) {
+    const userId = req.user.sub;
+    const data = await this.studentsService.createStudent(userId, payload);
+    return {
+      status: 'success',
+      message: 'Student created successfully',
+      data
+    };
+  }
+
+  @Put(':id')
+  async updateStudent(@Param('id') id: string, @Request() req: any, @Body() payload: any) {
+    const userId = req.user.sub;
+    const data = await this.studentsService.updateStudent(+id, userId, payload);
+    return {
+      status: 'success',
+      message: 'Student updated successfully',
+      data
     };
   }
 

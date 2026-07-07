@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UseGuards, Req, Param } from '@nestjs/common';
 import { OmrService } from './omr.service';
 import { JwtAuthGuard } from '../auth/guards/auth-roles.guard';
 
@@ -14,6 +14,34 @@ export class OmrController {
     return {
       status: 'success',
       data: result,
+    };
+  }
+
+  @Get('students')
+  async getStudents(@Req() req: any) {
+    const userId = req.user.sub || req.user.userId;
+    const data = await this.omrService.getStudentsForCoordinator(userId);
+    return {
+      status: 'success',
+      data,
+    };
+  }
+
+  @Get('questions/:studentId')
+  async getQuestionsForStudent(@Param('studentId') studentId: string) {
+    const data = await this.omrService.getQuestionsForStudent(+studentId);
+    return {
+      status: 'success',
+      data,
+    };
+  }
+
+  @Get('responses/:studentId')
+  async getResponsesForStudent(@Param('studentId') studentId: string) {
+    const data = await this.omrService.getStudentResponses(+studentId);
+    return {
+      status: 'success',
+      data,
     };
   }
 

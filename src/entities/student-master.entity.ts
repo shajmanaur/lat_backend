@@ -9,6 +9,9 @@ export class StudentMaster {
   @Column({ length: 255 })
   full_name: string;
 
+  @Column({ length: 50, nullable: true })
+  apaar_id: string;
+
   @Column()
   roll_num: number;
 

@@ -95,6 +95,82 @@ export class TeachersService {
     return sections.map(s => s.section).filter(Boolean);
   }
 
+  async getAllocations(userId: number) {
+    const coord = await this.teacherRepo.findOne({ where: { user_id: userId } });
+    if (!coord) throw new BadRequestException('Coordinator profile not found');
+
+    const teachers = await this.teacherRepo.find({
+      where: { udise_code: coord.udise_code }
+    });
+
+    const mappings = await this.mappingRepo.find({
+      where: { udise_code: coord.udise_code }
+    });
+
+    const teacherAllocations = teachers.map(t => {
+      const teacherMap = mappings.filter(m => m.teacher_id === t.teacher_id?.toString() || m.teacher_id == (t.user_id as any));
+      
+      return {
+        id: t.teacher_id,
+        name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || `Teacher ${t.teacher_id}`,
+        email: t.email_id || '-',
+        mobile: t.mobile_no || '-',
+        role: t.designation || 'Teacher',
+        subjects: '-',
+        status: t.status ? 'Active' : 'Inactive',
+        assignedOn: new Date(t.created_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        allocations: teacherMap.map(m => ({ grade: m.grade, section: m.section }))
+      };
+    });
+
+    const total = teacherAllocations.reduce((acc, t) => acc + t.allocations.length, 0);
+    const active = teacherAllocations.filter(t => t.status === 'Active').reduce((acc, t) => acc + t.allocations.length, 0);
+    const inactive = teacherAllocations.filter(t => t.status === 'Inactive').reduce((acc, t) => acc + t.allocations.length, 0);
+    
+    // Find unique grades in the allocations
+    const uniqueGrades = new Set();
+    mappings.forEach(m => uniqueGrades.add(m.grade));
+
+    return {
+      allocations: teacherAllocations,
+      stats: { total, active, inactive, gradesCovered: uniqueGrades.size }
+    };
+  }
+
+  async allocateTeacher(userId: number, payload: any) {
+    const { teacher_id, grade, section } = payload;
+    if (!teacher_id || !grade || !section) {
+      throw new BadRequestException('Teacher ID, Grade, and Section are required');
+    }
+
+    const coord = await this.teacherRepo.findOne({ where: { user_id: userId } });
+    if (!coord) throw new BadRequestException('Coordinator profile not found');
+
+    const teacher = await this.teacherRepo.findOne({ where: { teacher_id } });
+    if (!teacher || teacher.udise_code !== coord.udise_code) {
+      throw new BadRequestException('Invalid teacher selection');
+    }
+
+    const existing = await this.mappingRepo.findOne({
+      where: { teacher_id, grade, section, udise_code: coord.udise_code }
+    });
+
+    if (existing) {
+      throw new BadRequestException('Teacher is already allocated to this grade and section');
+    }
+
+    const mapping = this.mappingRepo.create({
+      teacher_id,
+      grade,
+      section,
+      udise_code: coord.udise_code,
+      created_by: userId.toString()
+    });
+
+    await this.mappingRepo.save(mapping);
+    return { status: true, message: 'Teacher allocated successfully' };
+  }
+
   async createTeacher(payload: any, creatorUserId: number) {
     const { name, email, mobile, gender, designation } = payload;
 
@@ -136,7 +212,7 @@ export class TeachersService {
         last_name: nameParts.slice(1).join(' '),
         email_id: email,
         mobile_no: mobile,
-        gender: gender === 'Male' ? 1 : gender === 'Female' ? 2 : 0,
+        gender: gender === 'Male' ? 'm' : gender === 'Female' ? 'f' : 'o',
         designation: designation,
         udise_code: coord.udise_code,
         region_id: coord.region_id,
@@ -195,8 +271,9 @@ export class TeachersService {
         user.user_mobile = payload.mobile;
       }
     }
-    if (payload.gender) teacher.gender = payload.gender === 'Male' ? 1 : payload.gender === 'Female' ? 2 : 0;
     if (payload.designation) teacher.designation = payload.designation;
+    if (payload.gender) teacher.gender = payload.gender === 'Male' ? 'm' : payload.gender === 'Female' ? 'f' : 'o';
+    if (payload.birth_date) teacher.birth_date = payload.birth_date;
 
     teacher.updated_by = userId;
     teacher.updated_date = new Date();

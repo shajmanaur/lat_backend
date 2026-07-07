@@ -27,6 +27,19 @@ export class TeachersController {
     return { status: 'success', data };
   }
 
+  @Get('allocations')
+  async getAllocations(@Request() req: any) {
+    const userId = req.user.sub;
+    const data = await this.teachersService.getAllocations(userId);
+    return { status: 'success', data };
+  }
+
+  @Post('allocations')
+  async allocateTeacher(@Body() payload: any, @Request() req: any) {
+    const userId = req.user.sub;
+    return this.teachersService.allocateTeacher(userId, payload);
+  }
+
   @Post()
   async createTeacher(@Body() payload: any, @Request() req: any) {
     const userId = req.user.sub;
