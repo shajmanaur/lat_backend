@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OmrController } from './omr.controller';
 import { OmrService } from './omr.service';
+import { OmrUploadController } from './omr-upload.controller';
+import { OmrUploadService } from './omr-upload.service';
 import { OmrQuestionMaster } from '../../entities/omr-question-master.entity';
 import { OmrStudentResponse } from '../../entities/omr-student-response.entity';
 import { SubjectMaster } from '../../entities/subject-master.entity';
@@ -12,8 +14,8 @@ import { TeacherGradeSectionMapping } from '../../entities/teacher-grade-section
 
 @Module({
   imports: [TypeOrmModule.forFeature([OmrQuestionMaster, OmrStudentResponse, SubjectMaster, StudentMaster, TeacherMaster, GradeMaster, TeacherGradeSectionMapping])],
-  controllers: [OmrController],
-  providers: [OmrService],
+  controllers: [OmrController, OmrUploadController],
+  providers: [OmrService, OmrUploadService],
   exports: [OmrService],
 })
 export class OmrModule {}

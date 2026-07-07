@@ -29,6 +29,7 @@ async function seed() {
       { id: 6, menu_name: 'National Report', menu_link: '/national-report', menu_icon: 'Globe', menu_remarks: 'REPORTS', priority: 6 },
       { id: 7, menu_name: 'Region Report', menu_link: '/region-report', menu_icon: 'MapPin', menu_remarks: 'REPORTS', priority: 7 },
       { id: 8, menu_name: 'School Report', menu_link: '/school-report', menu_icon: 'Building', menu_remarks: 'REPORTS', priority: 8 },
+      { id: 14, menu_name: 'Upload OMR Data', menu_link: '/upload', menu_icon: 'UploadCloud', menu_remarks: 'DATA MANAGEMENT', priority: 9 },
 
       // Coordinator specific
       { id: 9, menu_name: 'Teacher List', menu_link: '/teachers', menu_icon: 'Users', menu_remarks: 'TEACHER MANAGEMENT', priority: 2 },
@@ -47,7 +48,7 @@ async function seed() {
     for (const m of menus) {
       await connection.execute(
         `INSERT INTO menu_master (id, menu_name, menu_link, menu_icon, menu_remarks, priority, status, is_parent, sub_menu, created_by) 
-         VALUES (?, ?, ?, ?, ?, ?, 1, 1, 0, 1)`,
+         VALUES (?, ?, ?, ?, ?, ?, 1, 1, 0, 10)`,
         [m.id, m.menu_name, m.menu_link, m.menu_icon, m.menu_remarks, m.priority]
       );
     }
@@ -55,8 +56,8 @@ async function seed() {
     console.log('Inserting into role_menu_mapping...');
     // Roles: 1=Superadmin, 2=Admin, 3=Coordinator, 4=Teacher, 5=Student
     const roleMappings = [
-      // Admin (Role 1 & 2)
-      ...[1, 2].flatMap(role => [1, 2, 3, 4, 5, 6, 7, 8].map(menuId => [role, menuId])),
+      // Admin (Role 1 & 2) - Removed 3 (Students)
+      ...[1, 2].flatMap(role => [1, 2, 4, 5, 6, 7, 8, 14].map(menuId => [role, menuId])),
       // Coordinator (Role 3) -> Uses dashboard #13 for 'MAIN' category instead of 'OVERVIEW', plus 9, 10, 11, 12
       ...[3].flatMap(role => [13, 9, 10, 11, 12].map(menuId => [role, menuId])),
       // Teacher (Role 4) -> Dashboard #13, Student List #11, Add OMR Result #12
@@ -65,7 +66,7 @@ async function seed() {
 
     for (const [roleId, menuId] of roleMappings) {
       await connection.execute(
-        `INSERT INTO role_menu_mapping (role_id, menu_id, created_by, status) VALUES (?, ?, 1, 1)`,
+        `INSERT INTO role_menu_mapping (role_id, menu_id, created_by, status) VALUES (?, ?, 10, 1)`,
         [roleId, menuId]
       );
     }
