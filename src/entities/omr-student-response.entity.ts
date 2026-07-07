@@ -21,9 +21,6 @@ export class OmrStudentResponse {
   @Column({ type: 'bigint', unsigned: true })
   student_id: number;
 
-  @Column({ type: 'bigint', unsigned: true, comment: 'The user who entered the OMR data' })
-  teacher_id: number;
-
   @Column({ type: 'bigint', unsigned: true })
   question_id: number;
 
@@ -51,10 +48,6 @@ export class OmrStudentResponse {
   @ManyToOne(() => StudentMaster)
   @JoinColumn({ name: 'student_id' })
   student: StudentMaster;
-
-  @ManyToOne(() => UserMaster)
-  @JoinColumn({ name: 'teacher_id' })
-  teacher: UserMaster;
 
   @ManyToOne(() => OmrQuestionMaster)
   @JoinColumn({ name: 'question_id' })

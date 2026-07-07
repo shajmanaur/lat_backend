@@ -7,6 +7,7 @@ import { UserMaster } from '../../entities/user-master.entity';
 import { OmrStudentResponse } from '../../entities/omr-student-response.entity';
 import { SchoolMaster } from '../../entities/school-master.entity';
 import { RegionMaster } from '../../entities/region-master.entity';
+import { GradeMaster } from '../../entities/grade-master.entity';
 
 @Injectable()
 export class DashboardService {
@@ -76,11 +77,12 @@ export class DashboardService {
     const progressCount = parseInt(progressResult?.count || '0', 10);
 
     const gradeQb = this.studentRepo.createQueryBuilder('s')
-      .select('s.grade', 'name')
+      .leftJoin(GradeMaster, 'gm', 's.grade_id = gm.grade_id')
+      .select('gm.grade_name', 'name')
       .addSelect('COUNT(s.student_id)', 'students')
       .where('s.status = :status', { status: true });
     if (udiseCode) gradeQb.andWhere('s.udise_code = :udiseCode', { udiseCode });
-    const gradeStats = await gradeQb.groupBy('s.grade').getRawMany();
+    const gradeStats = await gradeQb.groupBy('gm.grade_name').getRawMany();
 
     const predefinedGrades = [
       { id: '3', name: 'Grade 3', fill: '#34D399' }, 
@@ -89,7 +91,11 @@ export class DashboardService {
     ];
 
     const gradeData = predefinedGrades.map(pg => {
-      const found = gradeStats.find(g => g.name === pg.id || g.name === `0${pg.id}` || g.name === pg.name);
+      const romanId = pg.id === '3' ? 'iii' : pg.id === '6' ? 'vi' : pg.id === '9' ? 'ix' : '';
+      const found = gradeStats.find(g => {
+        const name = String(g.name).toLowerCase();
+        return name === pg.id || name === `0${pg.id}` || name === pg.name.toLowerCase() || name === romanId;
+      });
       return {
         name: pg.name,
         students: found ? parseInt(found.students, 10) : 0,
@@ -113,7 +119,7 @@ export class DashboardService {
     }));
 
     const actQb = this.omrRepo.createQueryBuilder('omr')
-      .leftJoinAndSelect('omr.teacher', 'teacher')
+      .leftJoinAndSelect('omr.creator', 'creator')
       .leftJoinAndSelect('omr.student', 'student')
       .orderBy('omr.created_at', 'DESC')
       .take(4);
@@ -124,7 +130,7 @@ export class DashboardService {
       id: idx + 1,
       type: act.status === 1 ? 'completed' : 'progress',
       text: act.status === 1 ? 'OMR processing completed' : 'OMR entry in progress',
-      subtext: `Student: ${act.student?.full_name || 'Unknown'} | By: ${act.teacher?.user_name || 'Unknown'}`,
+      subtext: `Student: ${act.student?.full_name || 'Unknown'} | By: ${act.creator?.user_name || 'Unknown'}`,
       time: act.created_at, 
       icon_type: act.status === 1 ? 'check' : 'file',
       bg: act.status === 1 ? '#D1FAE5' : '#DBEAFE',

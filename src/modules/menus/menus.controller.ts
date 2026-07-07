@@ -1,5 +1,6 @@
 import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiStandardResponses } from '../../common/decorators/swagger-response-example-api-standard.decorator';
 import { MenusService } from './menus.service';
 import { JwtAuthGuard } from '../auth/guards/auth-roles.guard';
 
@@ -12,6 +13,7 @@ export class MenusController {
 
   @Get('my-menus')
   @ApiOperation({ summary: 'Get sidebar menus for the logged in user' })
+  @ApiStandardResponses(Array)
   async getMyMenus(@Request() req) {
     // req.user is injected by JwtAuthGuard
     // It contains the decoded JWT payload { sub, username, roleId }

@@ -87,9 +87,10 @@ export class TeachersService {
 
     const sections = await this.studentRepo
       .createQueryBuilder('student')
+      .leftJoin(GradeMaster, 'gm', 'student.grade_id = gm.grade_id')
       .select('DISTINCT(student.section)', 'section')
       .where('student.udise_code = :udiseCode', { udiseCode: coordinator.udise_code })
-      .andWhere('LOWER(student.grade) = LOWER(:grade)', { grade })
+      .andWhere('LOWER(gm.grade_name) = LOWER(:grade)', { grade })
       .getRawMany();
 
     return sections.map(s => s.section).filter(Boolean);

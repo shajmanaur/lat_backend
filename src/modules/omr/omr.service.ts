@@ -41,10 +41,16 @@ export class OmrService {
         return []; // No allocated classes
       }
       
+      const gradesList = await this.gradeRepo.find();
+      const getGradeId = (name: string) => {
+        const found = gradesList.find(g => g.grade_name.toLowerCase() === name.toLowerCase() || g.grade_name.toLowerCase() === `grade ${name.toLowerCase()}`);
+        return found ? found.grade_id : null;
+      };
+      
       whereCondition = mappings.map(m => ({
         udise_code: teacher.udise_code,
         status: true,
-        grade: m.grade,
+        grade_id: getGradeId(m.grade),
         section: m.section
       }));
     }
@@ -52,7 +58,8 @@ export class OmrService {
     // Fetch students
     const students = await this.studentRepo.find({
       where: whereCondition,
-      order: { grade: 'ASC', section: 'ASC', full_name: 'ASC' }
+      relations: ['grade'],
+      order: { section: 'ASC', full_name: 'ASC' }
     });
 
     // Fetch latest response status for each student
@@ -91,16 +98,13 @@ export class OmrService {
     const student = await this.studentRepo.findOne({ where: { student_id: studentId } });
     if (!student) throw new BadRequestException('Student not found');
 
-    const gradeName = student.grade; // e.g. 'III'
-    const grade = await this.gradeRepo.findOne({ where: { grade_name: gradeName } });
-    
-    if (!grade) {
+    if (!student.grade_id) {
       return [];
     }
 
     // Usually we also match by subject, but assuming 1 subject for LAT right now based on UI
     return this.questionRepo.find({
-      where: { grade_id: grade.grade_id, status: 1 },
+      where: { grade_id: student.grade_id, status: 1 },
       order: { item_number: 'ASC' }
     });
   }
@@ -121,11 +125,10 @@ export class OmrService {
 
   async saveStudentResponses(payload: {
     student_id: number;
-    teacher_id: number;
     responses: { question_id: number; selected_option: string }[];
     status: number; // 0 for draft, 1 for submitted
   }, userId: string | number) {
-    const { student_id, teacher_id, responses, status } = payload;
+    const { student_id, responses, status } = payload;
 
     // Fetch all relevant question metadata to determine correctness
     const questionIds = responses.map(r => r.question_id);
@@ -145,7 +148,6 @@ export class OmrService {
 
       const entity = this.responseRepo.create({
         student_id,
-        teacher_id,
         question_id: resp.question_id,
         selected_option: resp.selected_option,
         is_correct,

@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { UserMaster } from './user-master.entity';
+import { GradeMaster } from './grade-master.entity';
 
 @Entity('student_master')
 export class StudentMaster {
@@ -15,8 +16,12 @@ export class StudentMaster {
   @Column()
   roll_num: number;
 
-  @Column({ type: 'enum', enum: ['nursery','lkg','ukg','i','ii','iii','iv','v','vi','vii','viii','ix','x','xi','xii'] })
-  grade: string;
+  @Column({ type: 'int', unsigned: true, nullable: true })
+  grade_id: number;
+
+  @ManyToOne(() => GradeMaster)
+  @JoinColumn({ name: 'grade_id' })
+  grade: GradeMaster;
 
   @Column({ length: 50 })
   section: string;

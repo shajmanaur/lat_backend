@@ -5,6 +5,8 @@ import { UserMaster } from '../../entities/user-master.entity';
 import { JwtService } from '@nestjs/jwt';
 import { encrypt } from '../../utils/encryption';
 
+import { LoginDto } from './dto/login.dto';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -13,14 +15,14 @@ export class AuthService {
     private readonly jwtService: JwtService
   ) {}
 
-  async login(payload: any) {
-    const { username, password } = payload;
+  async login(payload: LoginDto) {
+    const { user_name, password } = payload;
     
     // Encrypt the incoming password to match what's in the DB
     const encryptedPassword = encrypt(password);
     
     const user = await this.userRepo.findOne({
-      where: { user_name: username, password: encryptedPassword, status: '1' }
+      where: { user_name: user_name, password: encryptedPassword, status: '1' }
     });
 
     if (!user) {

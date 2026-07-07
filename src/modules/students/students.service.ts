@@ -13,18 +13,26 @@ export class StudentsService {
     private readonly teacherRepository: Repository<TeacherMaster>,
   ) {}
 
-  async findAll(page: number = 1, limit: number = 10, userId: number): Promise<{ data: StudentMaster[], total: number }> {
+  async findAll(page: number = 1, limit: number = 10, userId: number, roleId: number = 3): Promise<{ data: StudentMaster[], total: number }> {
     const skip = (page - 1) * limit;
 
-    const coord = await this.teacherRepository.findOne({ where: { user_id: userId } });
-    const udise_code = coord ? coord.udise_code : null;
+    let udise_code = null;
     
-    if (!udise_code) {
-      return { data: [], total: 0 };
+    // If not admin, restrict by udise_code
+    if (roleId !== 2) {
+      const coord = await this.teacherRepository.findOne({ where: { user_id: userId } });
+      udise_code = coord ? coord.udise_code : null;
+      
+      if (!udise_code) {
+        return { data: [], total: 0 };
+      }
     }
     
+    const whereCondition = udise_code ? { udise_code } : {};
+
     const [data, total] = await this.studentRepository.findAndCount({
-      where: { udise_code },
+      where: whereCondition,
+      relations: ['grade'],
       order: {
         created_at: 'DESC',
       },
@@ -36,7 +44,7 @@ export class StudentsService {
   }
 
   async findOne(id: number): Promise<StudentMaster> {
-    return this.studentRepository.findOne({ where: { student_id: id } });
+    return this.studentRepository.findOne({ where: { student_id: id }, relations: ['grade'] });
   }
 
   async createStudent(userId: number, payload: any) {
@@ -45,7 +53,7 @@ export class StudentsService {
       throw new Error('Coordinator profile not found');
     }
 
-    const { full_name, apaar_id, gender, grade, section } = payload;
+    const { full_name, apaar_id, gender, grade_id, section } = payload;
     
     // Auto increment roll number for simplicity in this mock
     const [lastStudent] = await this.studentRepository.find({
@@ -58,7 +66,7 @@ export class StudentsService {
       full_name,
       apaar_id: apaar_id || null,
       gender: gender === 'Male' ? 'm' : gender === 'Female' ? 'f' : 'o',
-      grade,
+      grade_id: +grade_id,
       section,
       udise_code: coord.udise_code,
       roll_num,
@@ -81,14 +89,16 @@ export class StudentsService {
       throw new Error('Student not found or unauthorized');
     }
 
-    const { full_name, apaar_id, gender, grade, section } = payload;
+    const { full_name, apaar_id, gender, grade_id, section } = payload;
     
     student.full_name = full_name;
     student.apaar_id = apaar_id || null;
     if (gender) {
       student.gender = gender === 'Male' ? 'm' : gender === 'Female' ? 'f' : 'o';
     }
-    student.grade = grade;
+    if (grade_id) {
+      student.grade_id = +grade_id;
+    }
     student.section = section;
     student.updated_by = userId;
 
