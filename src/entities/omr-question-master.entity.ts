@@ -10,6 +10,7 @@ import {
 import { UserMaster } from './user-master.entity';
 import { GradeMaster } from './grade-master.entity';
 import { SubjectMaster } from './subject-master.entity';
+import { AssessmentMaster } from './assessment-master.entity';
 
 @Entity('omr_question_master')
 export class OmrQuestionMaster {
@@ -21,6 +22,13 @@ export class OmrQuestionMaster {
 
   @Column({ type: 'int', unsigned: true })
   subject_id: number;
+
+  @Column({ type: 'bigint', unsigned: true, nullable: true })
+  assessment_id: number;
+
+  @ManyToOne(() => AssessmentMaster)
+  @JoinColumn({ name: 'assessment_id' })
+  assessment: AssessmentMaster;
 
   @ManyToOne(() => GradeMaster)
   @JoinColumn({ name: 'grade_id' })

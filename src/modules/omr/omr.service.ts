@@ -7,6 +7,7 @@ import { StudentMaster } from '../../entities/student-master.entity';
 import { TeacherMaster } from '../../entities/teacher-master.entity';
 import { GradeMaster } from '../../entities/grade-master.entity';
 import { TeacherGradeSectionMapping } from '../../entities/teacher-grade-section-mapping.entity';
+import { AssessmentMaster } from '../../entities/assessment-master.entity';
 
 @Injectable()
 export class OmrService {
@@ -23,7 +24,13 @@ export class OmrService {
     private readonly gradeRepo: Repository<GradeMaster>,
     @InjectRepository(TeacherGradeSectionMapping)
     private readonly mappingRepo: Repository<TeacherGradeSectionMapping>,
-  ) {}
+    @InjectRepository(AssessmentMaster)
+    private readonly assessmentRepo: Repository<AssessmentMaster>,
+  ) { }
+
+  async getAssessments() {
+    return await this.assessmentRepo.find({ where: { status: 1 } });
+  }
 
   async getStudentsForCoordinator(userId: number, roleId?: number) {
     const teacher = await this.teacherRepo.findOne({ where: { user_id: userId } });
@@ -40,13 +47,13 @@ export class OmrService {
       if (mappings.length === 0) {
         return []; // No allocated classes
       }
-      
+
       const gradesList = await this.gradeRepo.find();
       const getGradeId = (name: string) => {
         const found = gradesList.find(g => g.grade_name.toLowerCase() === name.toLowerCase() || g.grade_name.toLowerCase() === `grade ${name.toLowerCase()}`);
         return found ? found.grade_id : null;
       };
-      
+
       whereCondition = mappings.map(m => ({
         udise_code: teacher.udise_code,
         status: true,
@@ -161,13 +168,112 @@ export class OmrService {
 
     // We can use save() which handles UPSERT if we supply the IDs, or we can clear existing and insert
     // Using an upsert or transaction is safer, but for now we'll delete existing for this student and insert new
-    
+
     await this.responseRepo.delete({ student_id });
     const saved = await this.responseRepo.save(responseEntities);
 
     return {
       message: 'OMR responses saved successfully',
       count: saved.length
+    };
+  }
+
+  async getEntryStatus(udise?: string, regionId?: string) {
+    let query = `
+      SELECT 
+        s.udise_code as udiseCode, 
+        MAX(s.school_name) as schoolName,
+        MAX(r.region_name) as regionName,
+        MAX(r.region_id) as regionId,
+        MAX(c.first_name) as coordFirstName,
+        MAX(c.last_name) as coordLastName,
+        COUNT(DISTINCT st.student_id) as expected,
+        COUNT(DISTINCT IF(o.status = 1, o.student_id, NULL)) as completed,
+        MAX(o.updated_at) as lastUpdated
+      FROM school_master s
+      LEFT JOIN region_master r ON s.region_id = r.region_id
+      LEFT JOIN teacher_master c ON c.udise_code = s.udise_code AND c.user_id IN (SELECT user_id FROM user_master WHERE role_id = 3)
+      LEFT JOIN student_master st ON st.udise_code = s.udise_code AND st.status = 1
+      LEFT JOIN omr_student_response o ON o.student_id = st.student_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    if (udise) {
+      query += ` AND s.udise_code = ?`;
+      params.push(udise);
+    }
+    if (regionId) {
+      query += ` AND r.region_id = ?`;
+      params.push(regionId);
+    }
+    query += ` GROUP BY s.udise_code`;
+
+    const rawData = await this.studentRepo.manager.query(query, params);
+
+    let totalExpected = 0;
+    let totalCompleted = 0;
+    const alignedSchools = [];
+
+    rawData.forEach((row: any, idx: number) => {
+      const expected = parseInt(row.expected, 10) || 0;
+      const completed = parseInt(row.completed, 10) || 0;
+      const notStarted = expected - completed;
+      const completionPercent = expected > 0 ? Math.round((completed / expected) * 100) : 0;
+
+      totalExpected += expected;
+      totalCompleted += completed;
+
+      alignedSchools.push({
+        id: idx + 1,
+        udise: row.udiseCode,
+        school: row.schoolName || '-',
+        coordinator: row.coordFirstName ? `${row.coordFirstName} ${row.coordLastName || ''}`.trim() : '-',
+        expected,
+        completed,
+        inProgress: 0,
+        notStarted: notStarted > 0 ? notStarted : 0,
+        completion: `${completionPercent}%`,
+        status: completionPercent === 100 ? 'Completed' : (completionPercent > 0 ? 'In Progress' : 'Not Started'),
+        updated: row.lastUpdated ? new Date(row.lastUpdated).toLocaleString() : '-'
+      });
+    });
+
+    let trendQuery = `
+      SELECT DATE(o.created_at) as date, COUNT(DISTINCT o.student_id) as count
+      FROM omr_student_response o
+      JOIN student_master st ON o.student_id = st.student_id
+      JOIN school_master s ON s.udise_code = st.udise_code
+      LEFT JOIN teacher_master c ON c.udise_code = s.udise_code AND c.user_id IN (SELECT user_id FROM user_master WHERE role_id = 3)
+      WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    `;
+    const trendParams: any[] = [];
+    if (udise) {
+      trendQuery += ` AND s.udise_code = ?`;
+      trendParams.push(udise);
+    }
+    if (regionId) {
+      trendQuery += ` AND s.region_id = ?`;
+      trendParams.push(regionId);
+    }
+    trendQuery += ` GROUP BY DATE(o.created_at) ORDER BY date ASC`;
+
+    const trendRaw = await this.studentRepo.manager.query(trendQuery, trendParams);
+
+    const formattedTrend = trendRaw.map((t: any) => {
+      const d = new Date(t.date);
+      return {
+        name: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        value: parseInt(t.count, 10)
+      };
+    });
+
+    return {
+      expected: totalExpected,
+      completed: totalCompleted,
+      inProgress: 0,
+      notStarted: (totalExpected - totalCompleted) > 0 ? (totalExpected - totalCompleted) : 0,
+      trend: formattedTrend,
+      alignedSchools
     };
   }
 }

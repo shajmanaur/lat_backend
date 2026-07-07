@@ -11,9 +11,10 @@ import { StudentMaster } from '../../entities/student-master.entity';
 import { TeacherMaster } from '../../entities/teacher-master.entity';
 import { GradeMaster } from '../../entities/grade-master.entity';
 import { TeacherGradeSectionMapping } from '../../entities/teacher-grade-section-mapping.entity';
+import { AssessmentMaster } from '../../entities/assessment-master.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([OmrQuestionMaster, OmrStudentResponse, SubjectMaster, StudentMaster, TeacherMaster, GradeMaster, TeacherGradeSectionMapping])],
+  imports: [TypeOrmModule.forFeature([OmrQuestionMaster, OmrStudentResponse, SubjectMaster, StudentMaster, TeacherMaster, GradeMaster, TeacherGradeSectionMapping, AssessmentMaster])],
   controllers: [OmrController, OmrUploadController],
   providers: [OmrService, OmrUploadService],
   exports: [OmrService],

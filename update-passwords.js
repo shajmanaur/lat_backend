@@ -26,13 +26,23 @@ async function updatePasswords() {
 
   console.log(`Setting all user passwords to: ${commonPassword}`);
   console.log(`Encrypted Hash: ${encryptedPassword}`);
+
+  const [rows] = await connection.execute(`SELECT * FROM user_master WHERE user_name = 'admin_demo'`);
+  if (rows.length === 0) {
+    console.log('admin_demo not found! Creating the account now...');
+    await connection.execute(
+      `INSERT INTO user_master (user_name, password, email, role_id, status) VALUES (?, ?, ?, ?, ?)`,
+      ['admin_demo', encryptedPassword, 'admin@demo.com', 1, '1'] // Assuming 1 is the Admin role ID
+    );
+    console.log('Successfully created admin_demo with password123!');
+  } else {
+    await connection.execute(
+      `UPDATE user_master SET password = ? WHERE user_name = 'admin_demo'`,
+      [encryptedPassword]
+    );
+    console.log('Successfully updated existing admin_demo password to password123!');
+  }
   
-  const [result] = await connection.execute(
-    `UPDATE user_master SET password = ? WHERE email = 'shad@yopmail.com' OR user_name LIKE 'Teacher_%'`,
-    [encryptedPassword]
-  );
-  
-  console.log(`Successfully updated ${result.affectedRows} users!`);
   await connection.end();
 }
 

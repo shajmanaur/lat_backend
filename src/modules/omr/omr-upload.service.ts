@@ -127,7 +127,7 @@ export class OmrUploadService {
           // Region
           let region = allRegions.find(rg => rg.region_name.toLowerCase() === regionName.toLowerCase());
           if (!region) {
-            region = regionRepo.create({ region_name: regionName, created_by: String(userId) });
+            region = regionRepo.create({ region_name: regionName, created_by: +userId });
             await regionRepo.save(region);
             allRegions.push(region);
           }
