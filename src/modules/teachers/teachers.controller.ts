@@ -1,15 +1,16 @@
 import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ApiStandardResponses } from '../../common/decorators/swagger-response-example-api-standard.decorator';
-import { TeachersService } from './teachers.service';
+
 import { JwtAuthGuard } from '../auth/guards/auth-roles.guard';
+import { TeachersService } from './teachers.service';
 
 @ApiTags('Teachers')
 @ApiBearerAuth('access-token')
 @Controller('teachers')
 @UseGuards(JwtAuthGuard)
 export class TeachersController {
-  constructor(private readonly teachersService: TeachersService) {}
+  constructor(private readonly teachersService: TeachersService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get list of teachers' })

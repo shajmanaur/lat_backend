@@ -25,7 +25,7 @@ export class OmrService {
     private readonly mappingRepo: Repository<TeacherGradeSectionMapping>,
   ) {}
 
-  async getStudentsForCoordinator(userId: number) {
+  async getStudentsForCoordinator(userId: number, roleId?: number) {
     const teacher = await this.teacherRepo.findOne({ where: { user_id: userId } });
     if (!teacher || !teacher.udise_code) {
       return [];
@@ -34,7 +34,7 @@ export class OmrService {
     // Determine where conditions based on role
     let whereCondition: any = { udise_code: teacher.udise_code, status: true };
 
-    if (teacher.role_id === 4) {
+    if (roleId === 4) {
       // It's a teacher, filter by allocations
       const mappings = await this.mappingRepo.find({ where: { teacher_id: String(userId) } });
       if (mappings.length === 0) {

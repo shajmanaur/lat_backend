@@ -1,15 +1,17 @@
 import { Controller, Post, Body, Get, Query, UseGuards, Req, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { OmrService } from './omr.service';
+
 import { JwtAuthGuard } from '../auth/guards/auth-roles.guard';
 import { SaveOmrDto } from './dto/save-omr.dto';
+import { OmrService } from './omr.service';
+
 
 @ApiTags('OMR')
 @ApiBearerAuth('access-token')
 @Controller('omr')
 @UseGuards(JwtAuthGuard)
 export class OmrController {
-  constructor(private readonly omrService: OmrService) {}
+  constructor(private readonly omrService: OmrService) { }
 
   @Post('save')
   @ApiOperation({ summary: 'Save or submit OMR responses' })
@@ -28,7 +30,8 @@ export class OmrController {
   @ApiResponse({ status: 200, description: 'List of students successfully retrieved.' })
   async getStudents(@Req() req: any) {
     const userId = req.user.sub || req.user.userId;
-    const data = await this.omrService.getStudentsForCoordinator(userId);
+    const roleId = req.user.role || req.user.roleId;
+    const data = await this.omrService.getStudentsForCoordinator(userId, roleId);
     return {
       status: 'success',
       data,
