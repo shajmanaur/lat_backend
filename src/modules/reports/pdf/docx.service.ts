@@ -141,13 +141,13 @@ export class DocxService {
     return new Paragraph({ spacing: { before: 160, after: 80 }, children: [this.t(text, { bold: true, size: 24, color: '1F2937' })] });
   }
   private sub(text: string): Paragraph {
-    return new Paragraph({ spacing: { before: 140, after: 60 }, children: [this.t(text.toUpperCase(), { bold: true, size: 18, color: '6B7280' })] });
+    return new Paragraph({ spacing: { before: 180, after: 80 }, children: [this.t(text.toUpperCase(), { bold: true, size: 19, color: '4B5563' })] });
   }
   private body(text: string): Paragraph {
-    return new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 }, children: [this.t(text)] });
+    return new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 300 }, children: [this.t(text, { color: '1F2937' })] });
   }
   private note(lines: string[]): Paragraph[] {
-    return lines.map((l) => new Paragraph({ spacing: { after: 20 }, children: [this.t(l, { italics: true, size: 17, color: '9CA3AF' })] }));
+    return lines.map((l) => new Paragraph({ spacing: { after: 30 }, children: [this.t(l, { italics: true, size: 18, color: '6B7280' })] }));
   }
   private banner(text: string): Paragraph {
     return new Paragraph({
@@ -175,18 +175,26 @@ export class DocxService {
     return new TableCell({
       width: { size: width, type: WidthType.DXA },
       borders: { top: border, bottom: border, left: border, right: border },
-      margins: { top: 60, bottom: 60, left: 100, right: 100 },
+      margins: { top: 80, bottom: 80, left: 110, right: 110 },
       shading: opts.fill ? { fill: opts.fill, type: ShadingType.CLEAR } : undefined,
       children,
     });
   }
-  private headCell(text: string, width: number, fill = STEEL): TableCell {
-    return this.cell([new Paragraph({ alignment: AlignmentType.CENTER, children: [this.t(text, { bold: true, size: 18, color: 'FFFFFF' })] })], width, { fill });
+  private headCell(text: string, width: number, fill = STEEL, columnSpan?: number): TableCell {
+    const border = { style: BorderStyle.SINGLE, size: 1, color: 'CBD5E1' };
+    return new TableCell({
+      width: { size: width, type: WidthType.DXA },
+      columnSpan,
+      borders: { top: border, bottom: border, left: border, right: border },
+      margins: { top: 60, bottom: 60, left: 100, right: 100 },
+      shading: { fill, type: ShadingType.CLEAR },
+      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [this.t(text, { bold: true, size: 18, color: 'FFFFFF' })] })],
+    });
   }
   private textCell(text: string, width: number, opts: any = {}): TableCell {
     return this.cell([new Paragraph({
       alignment: opts.align ?? AlignmentType.CENTER,
-      children: [this.t(text, { bold: opts.bold ?? false, size: opts.size ?? 19, color: opts.color })],
+      children: [this.t(text, { bold: opts.bold ?? false, size: opts.size ?? 20, color: opts.color ?? '111827' })],
     })], width, { fill: opts.fill });
   }
 
@@ -254,7 +262,7 @@ export class DocxService {
           width: { size: colW, type: WidthType.DXA },
           columnWidths: innerW,
           rows: [
-            new TableRow({ children: [this.headCell(`Number of Questions in ${g.gradeName}`, colW)] }),
+            new TableRow({ children: [this.headCell(`Number of Questions in ${g.gradeName}`, colW, STEEL, 2)] }),
             new TableRow({ children: [this.headCell('Subject', innerW[0], STEEL_LIGHT), this.headCell(assessment, innerW[1], STEEL_LIGHT)] }),
             ...g.subjects.map((x: any) => new TableRow({
               children: [this.textCell(x.subjectName, innerW[0], { align: AlignmentType.LEFT, bold: true, fill: 'F8FAFC', size: 17 }), this.textCell(String(x.numQuestions), innerW[1], { size: 17 })],
@@ -302,7 +310,8 @@ export class DocxService {
           new TableRow({
             children: [
               this.headCell('Regions Participated', w), this.headCell('Schools Participated', w), this.headCell('Grades', w),
-              ...report.grades.map((g: any) => this.headCell(`Students (${g.gradeName})`, w)),
+              // Non-breaking spaces so "Grade 3" can never split across lines.
+              ...report.grades.map((g: any) => this.headCell(`Students (${String(g.gradeName).replace(/ /g, ' ')})`, w)),
             ],
           }),
           new TableRow({
@@ -379,7 +388,7 @@ export class DocxService {
           kids.push(...this.img(images, `g${g.gradeId}-s${si}-comp`));
           kids.push(...this.note(['Note: The overall average score for each competency shown in the graph is expressed in percentage.']));
           for (const c of [...subj.competencies].sort((a: any, b: any) => b.nationalAvgPct - a.nationalAvgPct)) {
-            kids.push(new Paragraph({ spacing: { after: 20 }, children: [this.t(`${c.code}: `, { bold: true, size: 17, color: '3730A3' }), this.t(c.description, { size: 17, color: '6B7280' })] }));
+            kids.push(new Paragraph({ spacing: { after: 30 }, children: [this.t(`${c.code}: `, { bold: true, size: 18, color: '3730A3' }), this.t(c.description, { size: 18, color: '374151' })] }));
           }
           kids.push(this.performerTable(g, subj));
           kids.push(this.body(competencyNarrative(subj.competencies, subj.subjectName)));
@@ -433,7 +442,7 @@ export class DocxService {
           width: { size: CONTENT_DXA, type: WidthType.DXA },
           columnWidths: w,
           rows: [
-            new TableRow({ children: [this.headCell(`${sub.subjectName} — No. of questions: ${sub.numQuestions}`, CONTENT_DXA)] }),
+            new TableRow({ children: [this.headCell(`${sub.subjectName} — No. of questions: ${sub.numQuestions}`, CONTENT_DXA, STEEL, 2)] }),
             ...sub.competencies.map((c: any) => new TableRow({
               children: [
                 this.textCell(c.code, w[0], { bold: true, color: '3730A3', fill: 'F8FAFC' }),
@@ -473,12 +482,12 @@ export class DocxService {
   private performerTable(g: any, subj: any): Table {
     const w = [Math.round(CONTENT_DXA * 0.3), Math.round(CONTENT_DXA * 0.27), Math.round(CONTENT_DXA * 0.27), Math.round(CONTENT_DXA * 0.16)];
     const lines = (arr: any[], color: string) =>
-      arr.map((r: any) => new Paragraph({ spacing: { after: 10 }, children: [this.t(`${r.regionName} `, { bold: true, size: 17, color }), this.t(`(${r1(r.avgPct)})`, { size: 17, color: '9CA3AF' })] }));
+      arr.map((r: any) => new Paragraph({ spacing: { after: 15 }, children: [this.t(`${r.regionName} `, { bold: true, size: 18, color }), this.t(`(${r1(r.avgPct)})`, { size: 18, color: '6B7280' })] }));
     return new Table({
       width: { size: CONTENT_DXA, type: WidthType.DXA },
       columnWidths: w,
       rows: [
-        new TableRow({ children: [this.headCell(`${g.gradeName}: Top and Bottom Performers in ${subj.subjectName}`, CONTENT_DXA)] }),
+        new TableRow({ children: [this.headCell(`${g.gradeName}: Top and Bottom Performers in ${subj.subjectName}`, CONTENT_DXA, STEEL, 4)] }),
         new TableRow({
           children: [
             this.headCell('Competency', w[0], STEEL_LIGHT), this.headCell('Top Performers', w[1], STEEL_LIGHT),
