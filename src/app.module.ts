@@ -19,6 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { MenusModule } from './modules/menus/menus.module';
 import { SchoolsModule } from './modules/schools/schools.module';
 import { TeachersModule } from './modules/teachers/teachers.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 import { MailModule } from './modules/mail/mail.module';
 
@@ -65,6 +66,7 @@ import { MailModule } from './modules/mail/mail.module';
     MenusModule,
     SchoolsModule,
     TeachersModule,
+    ReportsModule,
   ],
   providers: [],
 })
