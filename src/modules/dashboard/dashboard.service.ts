@@ -11,6 +11,8 @@ import { GradeMaster } from '../../entities/grade-master.entity';
 
 @Injectable()
 export class DashboardService {
+  private static overviewCache = new Map<string, { data: any, timestamp: number }>();
+
   constructor(
     @InjectRepository(StudentMaster) private studentRepo: Repository<StudentMaster>,
     @InjectRepository(TeacherMaster) private teacherRepo: Repository<TeacherMaster>,
@@ -19,8 +21,8 @@ export class DashboardService {
     private dataSource: DataSource,
   ) {}
 
-  async getOverviewStats(userId: number, roleId: number) {
-    let udiseCode = null;
+  async getOverviewStats(userId: number, roleId: number, filters?: { regionId?: number, udise?: string, gradeId?: number, section?: string }) {
+    let udiseCode = filters?.udise || null;
     if (roleId === 3) {
       const coord = await this.teacherRepo.findOne({ where: { user_id: userId } });
       if (coord) udiseCode = coord.udise_code;
@@ -40,40 +42,62 @@ export class DashboardService {
       cQb.innerJoin(TeacherMaster, 't', 't.user_id = u.user_id')
          .andWhere('t.udise_code = :udiseCode', { udiseCode });
     }
+    if (filters?.regionId) {
+      cQb.innerJoin(SchoolMaster, 'sm', 't.udise_code = sm.udise_code')
+         .andWhere('sm.region_id = :regionId', { regionId: filters.regionId });
+    }
     const totalCoordinators = await cQb.getCount();
     
     // For students
     const sQb = this.studentRepo.createQueryBuilder('s')
       .where('s.status = :status', { status: true });
+    
     if (udiseCode) sQb.andWhere('s.udise_code = :udiseCode', { udiseCode });
+    if (filters?.regionId && !udiseCode) {
+      sQb.innerJoin(SchoolMaster, 'school', 'school.udise_code = s.udise_code')
+         .andWhere('school.region_id = :regionId', { regionId: filters.regionId });
+    }
+    if (filters?.gradeId) sQb.andWhere('s.grade_id = :gradeId', { gradeId: filters.gradeId });
+    if (filters?.section) sQb.andWhere('s.section = :section', { section: filters.section });
+    
     const totalStudents = await sQb.getCount();
 
     // For OMR
     const buildOmrQb = () => {
-      const qb = this.omrRepo.createQueryBuilder('omr');
-      if (udiseCode) {
-        qb.innerJoin('omr.student', 's')
-          .andWhere('s.udise_code = :udiseCode', { udiseCode });
+      const qb = this.omrRepo.createQueryBuilder('omr').innerJoin('omr.student', 's');
+      if (udiseCode) qb.andWhere('s.udise_code = :udiseCode', { udiseCode });
+      if (filters?.regionId && !udiseCode) {
+        qb.innerJoin(SchoolMaster, 'school', 'school.udise_code = s.udise_code')
+          .andWhere('school.region_id = :regionId', { regionId: filters.regionId });
       }
+      if (filters?.gradeId) qb.andWhere('s.grade_id = :gradeId', { gradeId: filters.gradeId });
+      if (filters?.section) qb.andWhere('s.section = :section', { section: filters.section });
       return qb;
     };
 
-    const presentResult = await buildOmrQb()
-      .select('COUNT(DISTINCT omr.student_id)', 'count')
-      .getRawOne();
+    const hasFilters = filters?.regionId || filters?.udise || filters?.gradeId || filters?.section;
+
+    if (!hasFilters) {
+      // Simple memory cache to prevent 6s queries on every dashboard load
+      if (!DashboardService.overviewCache) {
+        DashboardService.overviewCache = new Map();
+      }
+      const cacheKey = `${userId}_${roleId}_${udiseCode || 'admin'}`;
+      const cached = DashboardService.overviewCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
+        return cached.data;
+      }
+    }
+
+    const [presentResult, evaluatedResult, progressResult] = await Promise.all([
+      buildOmrQb().select('COUNT(DISTINCT omr.student_id)', 'count').getRawOne(),
+      buildOmrQb().select('COUNT(DISTINCT omr.student_id)', 'count').andWhere('omr.status = :status', { status: 1 }).getRawOne(),
+      buildOmrQb().select('COUNT(DISTINCT omr.student_id)', 'count').andWhere('omr.status = :status', { status: 0 }).getRawOne()
+    ]);
+
     const studentsPresent = parseInt(presentResult?.count || '0', 10);
     const studentsAbsent = Math.max(0, totalStudents - studentsPresent);
-
-    const evaluatedResult = await buildOmrQb()
-      .select('COUNT(DISTINCT omr.student_id)', 'count')
-      .andWhere('omr.status = :status', { status: 1 })
-      .getRawOne();
     const evaluatedCount = parseInt(evaluatedResult?.count || '0', 10);
-    
-    const progressResult = await buildOmrQb()
-      .select('COUNT(DISTINCT omr.student_id)', 'count')
-      .andWhere('omr.status = :status', { status: 0 })
-      .getRawOne();
     const progressCount = parseInt(progressResult?.count || '0', 10);
 
     const gradeQb = this.studentRepo.createQueryBuilder('s')
@@ -118,14 +142,26 @@ export class DashboardService {
       value: parseInt(r.value, 10)
     }));
 
-    const actQb = this.omrRepo.createQueryBuilder('omr')
-      .leftJoinAndSelect('omr.creator', 'creator')
-      .leftJoinAndSelect('omr.student', 'student')
+    const idQb = this.omrRepo.createQueryBuilder('omr')
+      .select('omr.id', 'id')
       .orderBy('omr.created_at', 'DESC')
-      .take(4);
-    if (udiseCode) actQb.andWhere('student.udise_code = :udiseCode', { udiseCode });
-    const recentActivities = await actQb.getMany();
-    
+      .limit(4);
+    if (udiseCode) {
+      idQb.innerJoin('omr.student', 'student')
+          .andWhere('student.udise_code = :udiseCode', { udiseCode });
+    }
+    const latestIdsRaw = await idQb.getRawMany();
+    const latestIds = latestIdsRaw.map(r => r.id);
+
+    let recentActivities = [];
+    if (latestIds.length > 0) {
+      recentActivities = await this.omrRepo.createQueryBuilder('omr')
+        .leftJoinAndSelect('omr.creator', 'creator')
+        .leftJoinAndSelect('omr.student', 'student')
+        .where('omr.id IN (:...ids)', { ids: latestIds })
+        .orderBy('omr.created_at', 'DESC')
+        .getMany();
+    }    
     const activities = recentActivities.map((act, idx) => ({
       id: idx + 1,
       type: act.status === 1 ? 'completed' : 'progress',
@@ -142,7 +178,7 @@ export class DashboardService {
       { name: 'Evaluated', value: evaluatedCount, color: '#10B981' },
     ];
 
-    return {
+    const result = {
       coordinators: totalCoordinators,
       teachers: totalTeachers,
       students: totalStudents,
@@ -155,5 +191,12 @@ export class DashboardService {
       regionData,
       activities
     };
+
+    if (!hasFilters) {
+      const cacheKey = `${userId}_${roleId}_${udiseCode || 'admin'}`;
+      DashboardService.overviewCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    }
+
+    return result;
   }
 }
