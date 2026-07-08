@@ -113,93 +113,91 @@ export class CoordinatorsService {
 
   async createBulk(payload: any, userId: string | number) {
     const { region, school, coordinators } = payload;
+    
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    const results = { success: 0, failed: 0, errors: [] };
+    const emailsToSend = [];
 
-    for (const c of coordinators) {
-      try {
+    try {
+      for (const c of coordinators) {
         const name = c.Name || c.name || '';
         const email = c.Email || c.email || '';
         const mobile = String(c.Mobile || c.mobile || '');
 
         if (!email) {
-          results.failed++;
-          results.errors.push(`Missing email for ${name}`);
-          continue;
+          throw new BadRequestException(`Missing email for ${name || 'coordinator'}`);
+        }
+        if (!mobile || mobile.length !== 10) {
+          throw new BadRequestException(`Invalid or missing 10-digit mobile number for ${name} (${email})`);
         }
 
-        let user = await this.userRepository.findOne({
+        const user = await queryRunner.manager.findOne(UserMaster, {
           where: [
             { email: email },
             { user_mobile: mobile }
           ]
         });
 
-        if (!user) {
-          const queryRunner = this.dataSource.createQueryRunner();
-          await queryRunner.connect();
-          await queryRunner.startTransaction();
-          
-          try {
-            user = this.userRepository.create({
-              user_name: email,
-              email: email,
-              user_mobile: mobile,
-              password: encrypt(mobile),
-              role_id: 3,
-              user_type_id: 3,
-              status: '1',
-              created_by: +userId,
-            });
-            await queryRunner.manager.save(user);
-
-            const nameParts = name.split(' ');
-            let coord = this.teacherRepository.create({
-              user_id: user.user_id,
-              first_name: nameParts[0],
-              last_name: nameParts.slice(1).join(' '),
-              email_id: email,
-              mobile_no: mobile,
-              region_id: +region,
-              udise_code: school,
-              created_by: +userId,
-            });
-            await queryRunner.manager.save(coord);
-            
-            await queryRunner.commitTransaction();
-            results.success++;
-          } catch (err: any) {
-            await queryRunner.rollbackTransaction();
-            results.failed++;
-            results.errors.push(`Failed for ${email}: ${err.message}`);
-          } finally {
-            await queryRunner.release();
-          }
-
-          // Send Welcome Email
-          try {
-            await this.mailService.sendWelcomeEmail(
-              email,
-              'COORDINATOR',
-              mobile, // Username is mobile
-              mobile, // Password is mobile
-              'System Admin', // Admin Name
-              school // School UDISE
-            );
-          } catch (e) {
-            console.error('Failed to send welcome email to', email, e);
-          }
-        } else {
-          results.failed++;
-          results.errors.push(`Coordinator ${email} already exists`);
+        if (user) {
+          throw new BadRequestException(`Coordinator with email ${email} or mobile ${mobile} already exists.`);
         }
-      } catch (e) {
-        results.failed++;
-        results.errors.push(`Error saving ${c.email}: ${e.message}`);
-      }
-    }
 
-    return results;
+        const newUser = this.userRepository.create({
+          user_name: email,
+          email: email,
+          user_mobile: mobile,
+          password: encrypt(mobile),
+          role_id: 3,
+          user_type_id: 3,
+          status: '1',
+          created_by: +userId,
+        });
+        await queryRunner.manager.save(newUser);
+
+        const nameParts = name.split(' ');
+        let coord = this.teacherRepository.create({
+          user_id: newUser.user_id,
+          first_name: nameParts[0] || 'Unknown',
+          last_name: nameParts.slice(1).join(' ') || '',
+          email_id: email,
+          mobile_no: mobile,
+          region_id: +region,
+          udise_code: school,
+          created_by: +userId,
+        });
+        await queryRunner.manager.save(coord);
+        
+        emailsToSend.push({ email, name, mobile, school });
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Send Welcome Emails after successful commit
+      for (const info of emailsToSend) {
+        try {
+          await this.mailService.sendWelcomeEmail(
+            info.email,
+            'COORDINATOR',
+            info.mobile,
+            info.mobile,
+            'System Admin',
+            info.school
+          );
+        } catch (e) {
+          console.error('Failed to send welcome email to', info.email, e);
+        }
+      }
+
+      return { success: coordinators.length, failed: 0, errors: [] };
+
+    } catch (err: any) {
+      await queryRunner.rollbackTransaction();
+      return { success: 0, failed: coordinators.length, errors: [err.message] };
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async updateCoordinator(id: number, payload: any, userId: string | number) {

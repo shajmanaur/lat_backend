@@ -13,6 +13,17 @@ import { OmrService } from './omr.service';
 export class OmrController {
   constructor(private readonly omrService: OmrService) { }
 
+  @Get('assessments')
+  @ApiOperation({ summary: 'Get all active assessments' })
+  @ApiResponse({ status: 200, description: 'Assessments retrieved.' })
+  async getAssessments() {
+    const data = await this.omrService.getAssessments();
+    return {
+      status: 'success',
+      data,
+    };
+  }
+
   @Post('save')
   @ApiOperation({ summary: 'Save or submit OMR responses' })
   @ApiResponse({ status: 201, description: 'Responses successfully saved/submitted.' })
@@ -72,6 +83,22 @@ export class OmrController {
     return {
       status: 'success',
       data: questions,
+    };
+  }
+
+  @Get('entry-status')
+  @ApiOperation({ summary: 'Get OMR entry status aggregation' })
+  @ApiQuery({ name: 'udise', required: false, description: 'School UDISE Code' })
+  @ApiQuery({ name: 'regionId', required: false, description: 'Region ID' })
+  @ApiResponse({ status: 200, description: 'Status retrieved.' })
+  async getEntryStatus(
+    @Query('udise') udise?: string,
+    @Query('regionId') regionId?: string
+  ) {
+    const data = await this.omrService.getEntryStatus(udise, regionId);
+    return {
+      status: 'success',
+      data,
     };
   }
 }
