@@ -4,6 +4,7 @@ import { OmrController } from './omr.controller';
 import { OmrService } from './omr.service';
 import { OmrUploadController } from './omr-upload.controller';
 import { OmrUploadService } from './omr-upload.service';
+import { TeacherOmrController } from './teacher-omr.controller';
 import { OmrQuestionMaster } from '../../entities/omr-question-master.entity';
 import { OmrStudentResponse } from '../../entities/omr-student-response.entity';
 import { SubjectMaster } from '../../entities/subject-master.entity';
@@ -15,8 +16,9 @@ import { AssessmentMaster } from '../../entities/assessment-master.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([OmrQuestionMaster, OmrStudentResponse, SubjectMaster, StudentMaster, TeacherMaster, GradeMaster, TeacherGradeSectionMapping, AssessmentMaster])],
-  controllers: [OmrController, OmrUploadController],
+  controllers: [OmrController, OmrUploadController, TeacherOmrController],
   providers: [OmrService, OmrUploadService],
   exports: [OmrService],
 })
 export class OmrModule {}
+

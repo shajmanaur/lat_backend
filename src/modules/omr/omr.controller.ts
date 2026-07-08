@@ -101,4 +101,34 @@ export class OmrController {
       data,
     };
   }
+
+  @Get('evaluation-status')
+  @ApiOperation({ summary: 'Get OMR evaluation status' })
+  @ApiQuery({ name: 'udise', required: false, description: 'School UDISE Code' })
+  @ApiQuery({ name: 'regionId', required: false, description: 'Region ID' })
+  @ApiQuery({ name: 'gradeId', required: false, description: 'Grade ID' })
+  @ApiResponse({ status: 200, description: 'Evaluation status retrieved.' })
+  async getEvaluationStatus(
+    @Query('udise') udise?: string,
+    @Query('regionId') regionId?: string,
+    @Query('gradeId') gradeId?: string
+  ) {
+    const data = await this.omrService.getEvaluationStatus({ udise, regionId, gradeId });
+    return {
+      status: 'success',
+      data,
+    };
+  }
+
+  @Post('evaluate/:udise')
+  @ApiOperation({ summary: 'Run evaluation for a specific school' })
+  @ApiParam({ name: 'udise', description: 'School UDISE Code' })
+  @ApiResponse({ status: 200, description: 'Evaluation completed.' })
+  async runEvaluation(@Param('udise') udise: string) {
+    const data = await this.omrService.runEvaluation(udise);
+    return {
+      status: 'success',
+      data,
+    };
+  }
 }

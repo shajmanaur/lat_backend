@@ -23,6 +23,7 @@ export class StudentsService {
     const skip = (page - 1) * limit;
 
     let udise_code = filters?.udise || null;
+    let teacherMappings = [];
     
     // If not admin, restrict by udise_code
     if (roleId !== 2 && roleId !== 1) {
@@ -33,6 +34,16 @@ export class StudentsService {
         return { data: [], total: 0 };
       }
       udise_code = coordUdise;
+      
+      if (roleId === 4) {
+        teacherMappings = await this.studentRepository.manager.query(
+          `SELECT grade, section FROM teacher_grade_section_mappings WHERE teacher_id = ?`,
+          [coord.teacher_id]
+        );
+        if (teacherMappings.length === 0) {
+          return { data: [], total: 0 };
+        }
+      }
     }
     
     const qb = this.studentRepository.createQueryBuilder('student')
@@ -66,8 +77,30 @@ export class StudentsService {
       qb.andWhere('(student.full_name LIKE :search OR student.apaar_id LIKE :search)', { search: `%${filters.search}%` });
     }
 
+    if (roleId === 4 && teacherMappings.length > 0) {
+      const conditions = teacherMappings.map((m, idx) => {
+        return `((grade.grade_name = :grade_${idx} OR student.grade_id = :grade_${idx}) AND student.section = :section_${idx})`;
+      });
+      const params: any = {};
+      teacherMappings.forEach((m, idx) => {
+        params[`grade_${idx}`] = m.grade;
+        params[`section_${idx}`] = m.section;
+      });
+      qb.andWhere(`(${conditions.join(' OR ')})`, params);
+    }
+
     const total = await qb.getCount();
     const { entities, raw } = await qb.skip(skip).take(limit).getRawAndEntities();
+
+    const studentIds = entities.map(e => e.student_id);
+    let omrStatuses: any[] = [];
+    if (studentIds.length > 0) {
+      omrStatuses = await this.studentRepository.manager.query(
+        `SELECT student_id FROM omr_student_response WHERE student_id IN (?) AND status = 1 GROUP BY student_id`,
+        [studentIds]
+      );
+    }
+    const completedStudentIds = new Set(omrStatuses.map(o => String(o.student_id)));
 
     const mappedData = entities.map(entity => {
       const rawRow = raw.find(r => r.student_student_id === entity.student_id);
@@ -84,7 +117,8 @@ export class StudentsService {
       return {
         ...entity,
         school_name: rawRow ? rawRow.school_school_name : null,
-        coordinator_name: coordinatorName
+        coordinator_name: coordinatorName,
+        omr_status: completedStudentIds.has(String(entity.student_id)) ? 'Added' : 'Not Started'
       };
     });
 

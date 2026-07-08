@@ -87,10 +87,35 @@ export class OmrUploadService {
         const questionsRow = data[1];
         const colMapping: { colIdx: number, subject_id: number, item_number: number }[] = [];
 
+        const normalizeSubjectName = (rawName: string): string => {
+          if (!rawName) return '';
+          const name = String(rawName).trim().toUpperCase();
+          if (name === 'MATH' || name === 'MATHS' || name === 'MATHEMATICS') {
+            return 'Math';
+          }
+          if (name === 'HINDI') {
+            return 'Hindi';
+          }
+          if (name === 'ENGLISH') {
+            return 'English';
+          }
+          if (name === 'SCIENCE') {
+            return 'Science';
+          }
+          if (name === 'SOCIAL SCIENCE') {
+            return 'Social Science';
+          }
+          if (name === 'SANSKRIT') {
+            return 'Sanskrit';
+          }
+          return rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+        };
+
         for (let c = 9; c < subjectsRow.length; c++) {
-          const subName = subjectsRow[c];
+          let subName = subjectsRow[c];
           const qName = questionsRow[c];
           if (subName && qName) {
+            subName = normalizeSubjectName(subName);
             let subject = allSubjects.find(s => s.subject_name.toLowerCase() === String(subName).toLowerCase());
             if (!subject) {
               subject = subjectRepo.create({ subject_name: String(subName), created_by: userId, status: true });

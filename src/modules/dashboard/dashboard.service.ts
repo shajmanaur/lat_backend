@@ -21,7 +21,103 @@ export class DashboardService {
     private dataSource: DataSource,
   ) {}
 
+  private emptyTeacherStats() {
+    return {
+      totalAllocations: { grades: 0, sections: 0 },
+      studentsAllocated: 0,
+      omrCompleted: 0,
+      pendingOmr: 0,
+      allocations: [],
+      activities: []
+    };
+  }
+
   async getOverviewStats(userId: number, roleId: number, filters?: { regionId?: number, udise?: string, gradeId?: number, section?: string }) {
+    if (roleId === 4) {
+      const teacher = await this.teacherRepo.findOne({ where: { user_id: userId } });
+      if (!teacher) return this.emptyTeacherStats();
+
+      const mappings = await this.dataSource.query(
+        `SELECT * FROM teacher_grade_section_mappings WHERE teacher_id = ?`,
+        [teacher.teacher_id]
+      );
+
+      if (mappings.length === 0) return this.emptyTeacherStats();
+
+      let distinctGrades = new Set();
+      let distinctSections = new Set();
+      let totalStudentsAllocated = 0;
+      let totalOmrCompleted = 0;
+      const allocationsList = [];
+
+      for (const m of mappings) {
+        distinctGrades.add(m.grade);
+        distinctSections.add(`${m.grade}-${m.section}`);
+
+        const qb = this.studentRepo.createQueryBuilder('s')
+          .leftJoin(GradeMaster, 'gm', 's.grade_id = gm.grade_id')
+          .where('s.udise_code = :udiseCode', { udiseCode: m.udise_code })
+          .andWhere('s.section = :section', { section: m.section })
+          .andWhere('(gm.grade_name = :grade OR s.grade_id = :grade)', { grade: m.grade })
+          .andWhere('s.status = :status', { status: 1 });
+          
+        const studentsInMapping = await qb.getCount();
+        
+        const omrQb = this.omrRepo.createQueryBuilder('omr')
+          .innerJoin('omr.student', 's')
+          .leftJoin(GradeMaster, 'gm', 's.grade_id = gm.grade_id')
+          .select('COUNT(DISTINCT omr.student_id)', 'count')
+          .where('s.udise_code = :udiseCode', { udiseCode: m.udise_code })
+          .andWhere('s.section = :section', { section: m.section })
+          .andWhere('(gm.grade_name = :grade OR s.grade_id = :grade)', { grade: m.grade })
+          .andWhere('omr.status = 1');
+          
+        const omrRes = await omrQb.getRawOne();
+        const omrCompleted = parseInt(omrRes?.count || '0', 10);
+
+        totalStudentsAllocated += studentsInMapping;
+        totalOmrCompleted += omrCompleted;
+
+        allocationsList.push({
+          grade: `Grade ${m.grade}`,
+          section: m.section,
+          students: studentsInMapping,
+          completed: omrCompleted,
+          status: studentsInMapping === 0 ? 'No Students' : (omrCompleted >= studentsInMapping ? 'Completed' : 'In Progress')
+        });
+      }
+
+      const activitiesData = await this.omrRepo.createQueryBuilder('omr')
+        .leftJoinAndSelect('omr.creator', 'creator')
+        .leftJoinAndSelect('omr.student', 'student')
+        .where('student.udise_code = :udiseCode', { udiseCode: teacher.udise_code })
+        .orderBy('omr.created_at', 'DESC')
+        .limit(4)
+        .getMany();
+
+      const formattedActivities = activitiesData.map((act, idx) => ({
+        id: idx + 1,
+        type: act.status === 1 ? 'completed' : 'progress',
+        text: act.status === 1 ? 'OMR processing completed' : 'OMR entry in progress',
+        subtext: `Student: ${act.student?.full_name || 'Unknown'}`,
+        time: act.created_at, 
+        icon_type: act.status === 1 ? 'check' : 'file',
+        bg: act.status === 1 ? '#D1FAE5' : '#DBEAFE',
+      }));
+
+      return {
+        totalAllocations: {
+          grades: distinctGrades.size,
+          sections: distinctSections.size
+        },
+        studentsAllocated: totalStudentsAllocated,
+        omrCompleted: totalOmrCompleted,
+        pendingOmr: Math.max(0, totalStudentsAllocated - totalOmrCompleted),
+        allocations: allocationsList,
+        activities: formattedActivities
+      };
+    }
+
     let udiseCode = filters?.udise || null;
     if (roleId === 3) {
       const coord = await this.teacherRepo.findOne({ where: { user_id: userId } });
@@ -64,14 +160,21 @@ export class DashboardService {
 
     // For OMR
     const buildOmrQb = () => {
-      const qb = this.omrRepo.createQueryBuilder('omr').innerJoin('omr.student', 's');
-      if (udiseCode) qb.andWhere('s.udise_code = :udiseCode', { udiseCode });
-      if (filters?.regionId && !udiseCode) {
-        qb.innerJoin(SchoolMaster, 'school', 'school.udise_code = s.udise_code')
-          .andWhere('school.region_id = :regionId', { regionId: filters.regionId });
+      const qb = this.omrRepo.createQueryBuilder('omr');
+      
+      const needsStudentJoin = udiseCode || filters?.gradeId || filters?.section || filters?.regionId;
+      
+      if (needsStudentJoin) {
+        qb.innerJoin('omr.student', 's');
+        if (udiseCode) qb.andWhere('s.udise_code = :udiseCode', { udiseCode });
+        if (filters?.regionId && !udiseCode) {
+          qb.innerJoin(SchoolMaster, 'school', 'school.udise_code = s.udise_code')
+            .andWhere('school.region_id = :regionId', { regionId: filters.regionId });
+        }
+        if (filters?.gradeId) qb.andWhere('s.grade_id = :gradeId', { gradeId: filters.gradeId });
+        if (filters?.section) qb.andWhere('s.section = :section', { section: filters.section });
       }
-      if (filters?.gradeId) qb.andWhere('s.grade_id = :gradeId', { gradeId: filters.gradeId });
-      if (filters?.section) qb.andWhere('s.section = :section', { section: filters.section });
+      
       return qb;
     };
 
