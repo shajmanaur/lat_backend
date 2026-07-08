@@ -22,6 +22,11 @@ export class OmrQuestionMaster {
   @Column({ type: 'int', unsigned: true })
   subject_id: number;
 
+  // Which assessment (assessment_master.assessment_id) this question belongs
+  // to. Nullable so existing rows survive schema sync; backfilled after add.
+  @Column({ type: 'bigint', unsigned: true, nullable: true })
+  assessment_id: number;
+
   @ManyToOne(() => GradeMaster)
   @JoinColumn({ name: 'grade_id' })
   grade: GradeMaster;
