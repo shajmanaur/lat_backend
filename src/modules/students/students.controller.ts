@@ -15,15 +15,31 @@ export class StudentsController {
   @ApiOperation({ summary: 'Get paginated list of students' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number', example: '1' })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page', example: '10' })
+  @ApiQuery({ name: 'regionId', required: false, description: 'Filter by Region' })
+  @ApiQuery({ name: 'udise', required: false, description: 'Filter by School' })
+  @ApiQuery({ name: 'gradeId', required: false, description: 'Filter by Grade' })
+  @ApiQuery({ name: 'section', required: false, description: 'Filter by Section' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by Name or APAAR' })
   @ApiStandardResponses(Object)
   async findAll(
     @Request() req: any,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '10'
+    @Query('limit') limit: string = '10',
+    @Query('regionId') regionId?: string,
+    @Query('udise') udise?: string,
+    @Query('gradeId') gradeId?: string,
+    @Query('section') section?: string,
+    @Query('search') search?: string
   ) {
     const userId = req.user.sub;
     const roleId = req.user.role;
-    const result = await this.studentsService.findAll(+page, +limit, userId, roleId);
+    const result = await this.studentsService.findAll(+page, +limit, userId, roleId, {
+      regionId: regionId ? +regionId : undefined,
+      udise,
+      gradeId: gradeId ? +gradeId : undefined,
+      section,
+      search
+    });
     return {
       status: 'success',
       data: result.data,
@@ -32,6 +48,19 @@ export class StudentsController {
         page: +page,
         limit: +limit,
       }
+    };
+  }
+
+  @Get('meta/sections')
+  @ApiOperation({ summary: 'Get distinct sections dynamically' })
+  @ApiQuery({ name: 'udise', required: false })
+  @ApiQuery({ name: 'gradeId', required: false })
+  @ApiStandardResponses(Array)
+  async getSections(@Query('udise') udise?: string, @Query('gradeId') gradeId?: string) {
+    const sections = await this.studentsService.getDistinctSections(udise, gradeId ? +gradeId : undefined);
+    return {
+      status: 'success',
+      data: sections
     };
   }
 

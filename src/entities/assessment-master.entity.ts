@@ -8,6 +8,8 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { UserMaster } from './user-master.entity';
+import { OmrQuestionMaster } from './omr-question-master.entity';
+import { OneToMany } from 'typeorm';
 
 @Entity('assessment_master')
 export class AssessmentMaster {
@@ -45,4 +47,7 @@ export class AssessmentMaster {
   @ManyToOne(() => UserMaster)
   @JoinColumn({ name: 'updated_by' })
   updater: UserMaster;
+
+  @OneToMany(() => OmrQuestionMaster, (question) => question.assessment)
+  questions: OmrQuestionMaster[];
 }
